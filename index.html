@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dori Savatchasi</title>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h3 {
+            color: #333;
+        }
+
+        .add-drug,
+        .search-bar,
+        .cart {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .add-drug input,
+        .search-bar input {
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: calc(33% - 15px);
+        }
+
+        .button {
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #218838;
+        }
+
+        #drug-list div,
+        #cart li {
+            margin: 5px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+
+        #cart li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #cart button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px;
+            cursor: pointer;
+        }
+
+        #cart button:hover {
+            background-color: #c82333;
+        }
+
+        #total {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="add-drug">
+        <input type="text" id="add-drug-input" placeholder="Yangi dorini qo'shing...">
+        <input type="number" id="add-drug-price" placeholder="Narxni kiriting...">
+        <input type="number" id="add-drug-quantity" placeholder="Mavjud miqdorni kiriting...">
+        <button class="button" onclick="addNewDrug()">Qo'shish</button>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Qidirish..." oninput="searchDrugs()">
+    </div>
+
+    <div id="drug-list"></div>
+    <div class="cart">
+        <h3>Savatcha:</h3>
+        <ul id="cart"></ul>
+        <div id="total"></div>
+        <button class="button" onclick="calculateTotal()">Umumiy narxni ko'rish</button>
+        <button class="button" onclick="checkout()">Xarid qilish</button>
+    </div>
+
+    <script>
+        const drugList = document.getElementById('drug-list');
+        const cart = document.getElementById('cart');
+        const totalDisplay = document.getElementById('total');
+        const searchInput = document.getElementById('search-input');
+
+        let drugs = JSON.parse(localStorage.getItem('drugs')) || [];
+        let cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+        let totalPrice = 0;
+
+        function saveData() {
+            localStorage.setItem('drugs', JSON.stringify(drugs));
+            localStorage.setItem('cartItems', JSON.stringify(cartItems));
+        }
+
+        function loadCart() {
+            cartItems.forEach(item => {
+                const drug = drugs.find(d => d.id === item.drug.id);
+                if (drug) {
+                    drug.availableQuantity -= item.quantity;
+                    totalPrice += drug.price * item.quantity;
+                }
+            });
+        }
+
+        function displayDrugs(drugsToDisplay) {
+            drugList.innerHTML = '';
+            drugsToDisplay.forEach(drug => {
+                if (drug.availableQuantity > 0) {
+                    const drugItem = document.createElement('div');
+                    drugItem.classList.add('drug-item');
+                    drugItem.innerHTML = `
+                        <span>${drug.name} - ${drug.price} so'm (${drug.availableQuantity} ta qolgan)</span>
+                        <button class="button" onclick="addToCart(${drug.id})">+</button>
+                        <button class="button" onclick="removeFromCart(${drug.id})">-</button>
+                    `;
+                    drugList.appendChild(drugItem);
+                }
+            });
+        }
+
+        function addToCart(drugId) {
+            const drug = drugs.find(d => d.id === drugId);
+
+            if (drug.availableQuantity > 0) {
+                const existingItem = cartItems.find(item => item.drug.id === drugId);
+                if (existingItem) {
+                    existingItem.quantity++;
+                } else {
+                    cartItems.push({ drug, quantity: 1 });
+                }
+
+                drug.availableQuantity--;
+                totalPrice += drug.price;
+                saveData();
+                updateCart();
+                displayDrugs(drugs);
+            } else {
+                alert(`Faqat ${drug.availableQuantity} ta mavjud.`);
+            }
+        }
+
+        function removeFromCart(drugId) {
+            const existingItem = cartItems.find(item => item.drug.id === drugId);
+            if (existingItem) {
+                const drug = drugs.find(d => d.id === drugId);
+                totalPrice -= existingItem.drug.price;
+
+                if (existingItem.quantity > 1) {
+                    existingItem.quantity--;
+                } else {
+                    cartItems = cartItems.filter(item => item.drug.id !== drugId);
+                }
+
+                drug.availableQuantity++;
+                saveData();
+                updateCart();
+                displayDrugs(drugs);
+            }
+        }
+
+        function updateCart() {
+            cart.innerHTML = '';
+            if (cartItems.length === 0) {
+                const emptyMessage = document.createElement('li');
+                emptyMessage.textContent = 'Tovarlar yo\'q.';
+                cart.appendChild(emptyMessage);
+            } else {
+                cartItems.forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `
+                        ${item.drug.name} - ${item.drug.price} so'm
+                        ${item.quantity}
+                    `;
+                    cart.appendChild(listItem);
+                });
+            }
+            totalDisplay.textContent = `Umumiy: ${totalPrice} so'm`;
+        }
+
+        function searchDrugs() {
+            const query = searchInput.value.toLowerCase();
+            const filteredDrugs = drugs.filter(drug => drug.name.toLowerCase().includes(query));
+            displayDrugs(filteredDrugs);
+        }
+
+        function calculateTotal() {
+            if (cartItems.length === 0) {
+                alert("Savatcha bo'sh. Iltimos, tovar qo'shing.");
+                return;
+            }
+            alert(`Umumiy narx: ${totalPrice} so'm`);
+        }
+
+        function checkout() {
+            if (cartItems.length === 0) {
+                alert("Savatcha bo'sh. Iltimos, tovar qo'shing.");
+                return;
+            }
+            alert(`Xarid qilindi: ${totalPrice} so'm`);
+            // Savatchani bo'shatish
+            cartItems = [];
+            totalPrice = 0;
+            saveData();
+            updateCart();
+        }
+
+        function addNewDrug() {
+            const drugInput = document.getElementById('add-drug-input');
+            const priceInput = document.getElementById('add-drug-price');
+            const quantityInput = document.getElementById('add-drug-quantity');
+
+            const drugName = drugInput.value;
+            const drugPrice = parseFloat(priceInput.value);
+            const drugQuantity = parseInt(quantityInput.value);
+
+            if (drugName && !isNaN(drugPrice) && !isNaN(drugQuantity) && drugQuantity > 0) {
+                const newDrug = {
+                    id: drugs.length + 1,
+                    name: drugName,
+                    price: drugPrice,
+                    availableQuantity: drugQuantity
+                };
+                drugs.push(newDrug);
+                drugInput.value = '';
+                priceInput.value = '';
+                quantityInput.value = '';
+                saveData();
+                displayDrugs(drugs);
+            } else {
+                alert('Iltimos, barcha maydonlarni to\'g\'ri to\'ldiring!');
+            }
+        }
+
+        loadCart();
+        displayDrugs(drugs);
+        updateCart();
+    </script>
+
+</body>
+
+</html>
